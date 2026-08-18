@@ -4,28 +4,34 @@ import atexit
 import saved
 import os
 
+# ─── Pi Zero 2W / 480×320 HyperPixel optimizations ───────────────────────────
+# Tell SDL2 to use its own ARM-optimised blitter instead of pygame's default.
+# Must be set BEFORE pygame.init() is called (done here at import time).
+os.environ.setdefault('PYGAME_BLEND_ALPHA_SDL2', '1')
+# Uncomment the line below to run directly on the framebuffer (no X11 needed):
+# os.environ.setdefault('SDL_VIDEODRIVER', 'kmsdrm')
+# os.environ.setdefault('SDL_AUDIODRIVER', 'alsa')
+# ─────────────────────────────────────────────────────────────────────────────
+
 # Custom
 name = "ZapWizard"
 
-# SCREEN
-WIDTH = 720
-HEIGHT = 720
-FULLSCREEN = False
+# SCREEN  ── native 480×320 to avoid any software scaling overhead
+WIDTH = 480
+HEIGHT = 320
+FULLSCREEN = True   # forces FULLSCREEN on Pi (avoids window manager overhead)
 
-# OUTPUT_WIDTH = 720
-# OUTPUT_HEIGHT = 720
+# Menu Position  (scaled from original 720×720)
+menu_x = 7
+menu_y = 62
 
-# Menu Position
-menu_x = 10
-menu_y = 140
-
-# Menu Position
+# Footer Position
 footer_x = 0
-footer_y = 631
+footer_y = 280
 
 # Description box Position
-description_box_x = 350
-description_box_y = 240
+description_box_x = 233
+description_box_y = 107
 
 # COLORS
 black = (0, 0, 0)
@@ -42,10 +48,12 @@ dark = (0, 40, 0)
 # MAP_FOCUS = (32.7157, 117.1611)
 # MAP_FOCUS = (-92.1943197, 38.5653437)
 # MAP_FOCUS = (-98.0878917, 30.1914818) # Zap's Hometown
-MAP_FOCUS = (-71.0594587, 42.3614408)  # Boston MA
-LOAD_CACHED_MAP = False
+MAP_FOCUS = (-116.2158, 33.7206)  # Indio, CA
+# Cached map avoids OSM network fetch and tile re-render on every boot.
+# Set to False only when you need to regenerate the map cache.
+LOAD_CACHED_MAP = True
 
-# Open Strett Map settings
+# Open Street Map settings
 WORLD_MAP_FOCUS = 0.07  # Needed to handle the 50k node limit from OSM
 
 # Google maps:
@@ -70,7 +78,6 @@ MODULES = {
     6: "PASSCODE"
 }
 
-# MODULE_TEXT = ["RADIO","MAP","DATA","INV","STAT"]
 MODULE_TEXT = ["STAT", "INV", "DATA", "MAP", "RADIO"]
 
 STARTER_MODULE = "data"
@@ -98,8 +105,6 @@ ACTIONS = {
 }
 
 # Using GPIO.BCM as mode
-# GPIO 23 pin16 reboot
-# GPIO 25 pin 22 blank screen do not use
 GPIO_ACTIONS = {
     #    19: "module_stats", #GPIO 4
     #    26: "module_items", #GPIO 14
@@ -113,59 +118,6 @@ GPIO_ACTIONS = {
     #    20: "knob_2", #GPIO 24
     #	25: "knob_3" #GPIO 23
 }
-#
-# MAP_ICONS = {
-#     "camp": pygame.image.load('images/map_icons/camp.png'),
-#     "factory": pygame.image.load('images/map_icons/factory.png'),
-#     "metro": pygame.image.load('images/map_icons/metro.png'),
-#     "misc": pygame.image.load('images/map_icons/misc.png'),
-#     "monument": pygame.image.load('images/map_icons/monument.png'),
-#     "vault": pygame.image.load('images/map_icons/vault.png'),
-#     "settlement": pygame.image.load('images/map_icons/settlement.png'),
-#     "ruin": pygame.image.load('images/map_icons/ruin.png'),
-#     "cave": pygame.image.load('images/map_icons/cave.png'),
-#     "landmark": pygame.image.load('images/map_icons/landmark.png'),
-#     "city": pygame.image.load('images/map_icons/city.png'),
-#     "office": pygame.image.load('images/map_icons/office.png'),
-#     "sewer": pygame.image.load('images/map_icons/sewer.png'),
-# }
-#
-# AMENITIES = {
-#     'pub': MAP_ICONS['vault'],
-#     'nightclub': MAP_ICONS['vault'],
-#     'bar': MAP_ICONS['vault'],
-#     'fast_food': MAP_ICONS['settlement'],
-#     'cafe': MAP_ICONS['settlement'],
-#     #	'drinking_water': 	MAP_ICONS['sewer'],
-#     'restaurant': MAP_ICONS['settlement'],
-#     'cinema': MAP_ICONS['office'],
-#     'pharmacy': MAP_ICONS['office'],
-#     'school': MAP_ICONS['office'],
-#     'bank': MAP_ICONS['monument'],
-#     'townhall': MAP_ICONS['monument'],
-#     #	'bicycle_parking': 	MAP_ICONS['misc'],
-#     #	'place_of_worship': MAP_ICONS['misc'],
-#     'theatre': MAP_ICONS['office'],
-#     #	'bus_station': 		MAP_ICONS['misc'],
-#     #	'parking': 			MAP_ICONS['misc'],
-#     #	'fountain': 		MAP_ICONS['misc'],
-#     #	'marketplace': 		MAP_ICONS['misc'],
-#     #	'atm': 				MAP_ICONS['misc'],
-#     'misc': MAP_ICONS['misc']
-# }
-#
-# INVENTORY_OLD = [
-#     "Ranger Sequoia",
-#     "Anti-Materiel Rifle ",
-#     "Deathclaw Gauntlet",
-#     "Flamer",
-#     "NCR dogtag",
-#     ".45-70 Gov't(20)",
-#     ".44 Magnum(20)",
-#     "Pulse Grenade (2)"
-# ]
-
-# Menu Structure: ["Menu item",Quantity,"Image (or folder for animation")","Description text",[["stats_text_1","stats_number_1"],["stats_text_2","stats_number_2"]]],
 
 FOOTER_RADIO = ["", "", "", "", False]
 
@@ -305,9 +257,11 @@ PERKS = [
 # Detect if running on a Raspberry Pi
 PI = False
 if os.name == "posix":
-    PI = True
-else:
-    PI - False
+    try:
+        with open('/proc/device-tree/model', 'r') as f:
+            PI = 'Raspberry' in f.read()
+    except Exception:
+        PI = True  # Assume Pi on any posix system without the model file
 
 pygame.font.init()
 RobotoB = {}
@@ -358,41 +312,20 @@ glitch = False
 glitch_time = 0.1
 glitch_next = 0
 
-
-
-#
-# # Force caching waveforms
-# # This can take a very long time on a Raspberry Pi or fail completely if the song is too long.
-# # I recommend running on a PC first.
-# force_caching = False
-#
-# # Generate waveforms at song load
-# do_not_use_cache = True
-
-# Set the target frames_per_second
-frame_per_second = 32
-fps_rate = (1/frame_per_second)
+# ─── Frame rate ───────────────────────────────────────────────────────────────
+# 24 FPS is plenty for a Pip-Boy UI and keeps the Pi Zero 2W CPU relaxed.
+# Raise to 30 if animations feel choppy; do NOT go above 30 on the Zero 2W.
+frame_per_second = 24
+fps_rate = (1 / frame_per_second)
+# ─────────────────────────────────────────────────────────────────────────────
 
 # Waveform related:
 waveform_frequency = 48000  # All your OGG files should be this rate to keep things in sync
-
-# This is the amount of pixel scrolling the waveform does per frame. It is basically a zoom control
-# A setting of 250 is the max, and close to a real-time view
 waveform_rate = 48
-
-# Setting this value too high will greatly delay song waveform generation
 waveform_fps = int(frame_per_second / 2)
 frame_skip = int(waveform_frequency / (waveform_fps * waveform_rate))
 
 CURRENT_SONG = None
 
 # Holotape related:
-holotape_generic = "images\inventory\holotape"
-
-# slow code debugger
-# debug_time = time.time()
-# time_past = time.time() - debug_time
-# if time_past:
-#     max_fps = int(1 / time_past)
-#     print("Holotape render took:", time_past, "max fps:", max_fps)
-
+holotape_generic = "images/inventory/holotape"
